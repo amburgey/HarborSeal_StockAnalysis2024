@@ -32,15 +32,21 @@
 # NOTE: if errors, can retrieve with tmp = fit$output(); tmp[[1]][40:60]
 # ------------------------------------------------------
 #
-sumstats = fit$draws(parms) %>%
-  summarise_draws(mean, mcse = mcse_mean, sd, 
-                  ~quantile(.x, probs = c(0.025, 0.05, 0.2, .95, .975)),
-                  N_eff = ess_bulk, rhat)
-sumstats = as.data.frame(sumstats)
-row.names(sumstats) = sumstats$variable; sumstats = sumstats[,-1] 
-#
-mcmc = as_draws_matrix(fit$draws(variables = parms))
-Nsims = nrow(mcmc)
-mcmc_array = as_draws_array(fit$draws(variables = parms))
-vn = colnames(mcmc)
+## CMDSTANR
+# sumstats = fit$draws(parms) %>%
+#   summarise_draws(mean, mcse = mcse_mean, sd, 
+#                   ~quantile(.x, probs = c(0.025, 0.05, 0.2, 0.95, 0.975)),
+#                   N_eff = ess_bulk, rhat)
+# sumstats = as.data.frame(sumstats)
+# row.names(sumstats) = sumstats$variable; sumstats = sumstats[,-1] 
+# #
+# mcmc = as_draws_matrix(fit$draws(variables = parms))
+# Nsims = nrow(mcmc)
+# mcmc_array = as_draws_array(fit$draws(variables = parms))
+# vn = colnames(mcmc)
 # rm(mod,fit)       # can also remove mod & fit from memory if no longer needed 
+
+## RSTAN
+
+sumstats <- as.data.frame(summary(fit)$summary)
+

@@ -1,4 +1,4 @@
-# State space population model for harbor seal stock assessment - revised as per reviewer comments to not condense 
+# State space population model for harbor seal stock assessment - revised as per reviewer comments 
 # Written by Staci Amburgey, WDFW Research Scientist
 rm(list=ls())
 
@@ -8,8 +8,8 @@ require(ggplot2)
 require(dplyr)
 require(readxl)
 require(bayesplot)
-require(cmdstanr)
-# require(rstan)
+# require(cmdstanr)
+require(rstan)
 require(posterior)
 require(parallel)
 require(fitdistrplus)
@@ -20,7 +20,7 @@ require(lubridate)
 # options(cmdstanr_write_stan_file_dir = "C:/rtemp")
 
 ## Set working directly.----
-setwd("S:/WP/Science/Westside Team/Science Datasets/Pinnipeds/Aerial surveys/Analysis")
+# setwd("S:/WP/Science/Westside Team/Science Datasets/Pinnipeds/Aerial surveys/Analysis")
 
 ## Specify which years and haulouts to select from each stock.----
 source("Scripts/data_selection.r")
@@ -167,15 +167,9 @@ stan.data = list(Nstk=Nstk,
                  Obs=Obs)
 
 # Fit model-------------------------------------------------
-
-
-
-
-#Cmdstanr - issues with writing files (permissions)
 fitmodel = "Scripts/State_space_example_noarea_revised.stan"
 
 parms = c("rmax","z","sigma_K","sigma_r","phi","K","MNPL","N","OSP")
-
 
 init_fun = function(){
   list(rmax = runif(4,0.2,0.3),
@@ -185,53 +179,70 @@ init_fun = function(){
        log_N0 = runif(Nstk,.9 * log(dfsum$N0_pri),1.1 * log(dfsum$N0_pri) ),
        phi = runif(1,10,30) ) }
 
+#Rstan - trying these to deal with permission issues
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
 
-nburnin = 2000#7000                    # number warm-up (burn-in) samples
-nsamples = 8000#50000                 # desired total number samples
-cores = detectCores()
-ncore = min(20,cores-2)
-Niter = round(nsamples/ncore)
-mod <- cmdstanr::cmdstan_model(fitmodel)   # compiles model (if necessary)
-suppressMessages(                # Suppress messages/warnings (if desired)
-  suppressWarnings (
-    fit <- mod$sample(
-      data = stan.data,
-      seed = 123,
-      chains = ncore,
-      parallel_chains = ncore,
-      refresh = 100,
-      init=init_fun,
-      iter_warmup = nburnin,
-      iter_sampling = Niter, 
-      adapt_delta = 0.99
-    )
-  )
-)
+## TRY UPDATING CORRECTION FACTOR TO 0.00001 INSTEAD OF LOWER ZERO
+
+fit <- stan(file = fitmodel, data = stan.data, chains=6, warmup = 10000, iter = 30000, pars = parms,  #warmup = 30000, iter = 50000
+            control=list(adapt_delta=0.99))  #, max_treedepth=12
+stan_trace(fit, pars = parms[1])
+saveRDS(fit, file="Results/fit_test_freePHI.rds")
+save(fit, file="Results/fit_test_freePHI.Rdata")
+
+
+#Cmdstanr - issues with writing files (permissions)
+# nburnin = 2000#7000                    # number warm-up (burn-in) samples
+# nsamples = 8000#50000                 # desired total number samples
+# cores = detectCores()
+# ncore = min(20,cores-2)
+# Niter = round(nsamples/ncore)
+# mod <- cmdstanr::cmdstan_model(fitmodel)   # compiles model (if necessary)
+# suppressMessages(                # Suppress messages/warnings (if desired)
+#   suppressWarnings (
+#     fit <- mod$sample(
+#       data = stan.data,
+#       seed = 123,
+#       chains = ncore,
+#       parallel_chains = ncore,
+#       refresh = 100,
+#       init=init_fun,
+#       iter_warmup = nburnin,
+#       iter_sampling = Niter, 
+#       adapt_delta = 0.99
+#     )
+#   )
+# )
 # Note: if error, run: fit$output(1)
 
 # Save output
 # saveRDS(fit, file = "Results/fit_SSM.rds")  #this will betray you and not save the tmp files needed to access results from model runs
 # save(fit, file="Results/fit_SSM.Rdata")     #USE THIS INSTEAD
 
-load("Results/fit_SSM_OSP_rev.Rdata")
+# load("Results/fit_SSM_OSP_rev.Rdata")
+load("Results/fit_test.Rdata")
 
+
+## CMDSTANR
 # Create table of summary stats for params of interest:
-source("Scripts/cmdstan_sumstats.r")
-
-mcmc_trace(fit$draws("rmax"))
-mcmc_trace(fit$draws("z"))
-mcmc_trace(fit$draws("sigma_r"))
-mcmc_trace(fit$draws("sigma_K"))
-mcmc_trace(fit$draws("phi"))
-mcmc_trace(fit$draws("K"))
-
-mcmc_areas(fit$draws(variables = c("K")), 
-           area_method="equal height",
-           prob = 0.8) + 
-  ggtitle(paste0("Posterior distributions, K")) +
-  theme_classic()
-
-ifelse(sumstats$rhat > 1.1, print("Failed to converge"), print("Less than 1.1"))
+# source("Scripts/cmdstan_sumstats.r")
+# 
+# 
+# mcmc_trace(fit$draws("rmax"))
+# mcmc_trace(fit$draws("z"))
+# mcmc_trace(fit$draws("sigma_r"))
+# mcmc_trace(fit$draws("sigma_K"))
+# mcmc_trace(fit$draws("phi"))
+# mcmc_trace(fit$draws("K"))
+# 
+# mcmc_areas(fit$draws(variables = c("K")), 
+#            area_method="equal height",
+#            prob = 0.8) + 
+#   ggtitle(paste0("Posterior distributions, K")) +
+#   theme_classic()
+# 
+# ifelse(sumstats$rhat > 1.1, print("Failed to converge"), print("Less than 1.1"))
 
 #convert all iteration output to data frame
 # df_res <- as_draws_df(fit)
@@ -258,29 +269,34 @@ ifelse(sumstats$rhat > 1.1, print("Failed to converge"), print("Less than 1.1"))
 #   facet_grid(vars(Stock), scales = "free")
 # print(plt_trnd)
 
+## RSTAN
+source("Scripts/cmdstan_sumstats.r")
 
-## Updated plots by S. Amburgey
+
+plot(fit, pars = "rmax", show_density = TRUE)
+plot(fit, pars = "z", show_density = TRUE)
+plot(fit, pars = "sigma_r", show_density = TRUE)
+plot(fit, pars = "sigma_K", show_density = TRUE)
+plot(fit, pars = "phi", show_density = TRUE)
+plot(fit, pars = "K", show_density = TRUE)
+
+ifelse(sumstats$Rhat > 1.1, print("Failed to converge"), print("Less than 1.1"))
+
+
+## Updated plots by S. Amburgey (RSTAN)
 start <- min(y$Year)
 end <- max(y$Year)
 
 
-Cresults$Year <- as.numeric(as.character(Cresults$Year))
+Cyears <- subset(y, Stock == "Coastal")$Year
+CSSM <- cbind(sumstats[which(startsWith(rownames(sumstats),"N[1")),c(1,4,8)],as.data.frame(start:end))
 
-png(filename="Results/Washington_Coast_SSM.png", height = 8, width = 8, units = "in", res = 300)
+png(filename="Results/Washington_Coast_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
 ggplot() +
-  # annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"K[1")),4], ymax = sumstats[which(startsWith(vn,"K[1")),8], alpha = .1,fill = "#4F9573") +
-  # annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"MNPL[1")),4], ymax = sumstats[which(startsWith(vn,"MNPL[1")),8], alpha = .1,fill = "#bd5702") +
-  geom_ribbon(data=cbind(sumstats[which(startsWith(vn,"N[1")),c(4,8)],as.data.frame(start:end)), aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
-  geom_line(data=cbind(sumstats[which(startsWith(vn,"N[1")),1],as.data.frame(start:end)), aes(x = `start:end`, y = `sumstats[which(startsWith(vn, "N[1")), 1]`), col="black") +
-  geom_point(data=Cresults, aes(x=Year, y=Abundance), pch=21, cex=2.5, fill="#06c5c9") +
-  geom_errorbar(data=Cresults, aes(x=Year, ymin = LCL, ymax = UCL), width = 0) +
-  # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[1")),1], col="#bd5702", lwd=0.65) +
-  # annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"MNPL[1")),1]+800), label="MNPL", color="#bd5702") +
-  # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[1")),4],lty=3, col="#bd5702", lwd=0.65) +
-  # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[1")),8],lty=3, col="#bd5702", lwd=0.65) +
-  # geom_hline(yintercept=sumstats[which(startsWith(vn,"K[1")),1],col="#4F9573", lwd=0.65) +
-  # annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"K[1")),1]+800), label="K", color="#4F9573") +
+  geom_ribbon(data=CSSM[,c(2:4)], aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
+  geom_line(data=CSSM[,c(1,4)], aes(x = `start:end`, y = mean), col="black") +
+  geom_point(data = subset(CSSM, `start:end` %in% Cyears), aes(x = `start:end`, y = mean), pch=23, cex=4, fill="#06c5c9") +
   scale_x_continuous(limits = c(start,end)) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
@@ -291,24 +307,22 @@ ggplot() +
 dev.off()
 
 
+HCyears <- subset(y, Stock == "Hood Canal")$Year
+HCSSM <- cbind(sumstats[which(startsWith(rownames(sumstats),"N[2")),c(1,4,8)],as.data.frame(start:end))
 
-HCresults$Year <- as.numeric(as.character(HCresults$Year))
 
-png(filename="Results/Hood_Canal_Stock_SSM.png", height = 8, width = 8, units = "in", res = 300)
+png(filename="Results/Hood_Canal_Stock_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
 ggplot() +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"K[2")),4], ymax = sumstats[which(startsWith(vn,"K[2")),8], alpha = .1,fill = "#4F9573") +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"MNPL[2")),4], ymax = sumstats[which(startsWith(vn,"MNPL[2")),8], alpha = .1,fill = "#bd5702") +
-  geom_ribbon(data=cbind(sumstats[which(startsWith(vn,"N[2")),c(4,8)],as.data.frame(start:end)), aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
-  geom_line(data=cbind(sumstats[which(startsWith(vn,"N[2")),1],as.data.frame(start:end)), aes(x = `start:end`, y = `sumstats[which(startsWith(vn, "N[2")), 1]`), col="black") +
-  geom_point(data=HCresults, aes(x=Year, y=Abundance), pch=21, cex=2.5, fill="#e82547") +
-  geom_errorbar(data=HCresults, aes(x=Year, ymin = LCL, ymax = UCL), width = 0) +
-  geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[2")),1], col="#bd5702", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"MNPL[2")),1]+200), label="MNPL", color="#bd5702") +
-  # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[2")),4],lty=3, col="#bd5702", lwd=0.65) +
-  # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[2")),8],lty=3, col="#bd5702", lwd=0.65) +
-  geom_hline(yintercept=sumstats[which(startsWith(vn,"K[2")),1],col="#4F9573", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"K[2")),1]+200), label="K", color="#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"K[2")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"K[2")),8], alpha = .1,fill = "#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"MNPL[2")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"MNPL[2")),8], alpha = .1,fill = "#bd5702") +
+  geom_ribbon(data=HCSSM, aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
+  geom_line(data=HCSSM, aes(x = `start:end`, y = mean), col="black") +
+  geom_point(data = subset(HCSSM, `start:end` %in% HCyears), aes(x = `start:end`, y = mean), pch=23, cex=4, fill="#e82547") +
+  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"MNPL[2")),1], col="#bd5702", lwd=0.65) +
+  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"MNPL[2")),1]+200), label="MNPL", color="#bd5702") +
+  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"K[2")),1],col="#4F9573", lwd=0.65) +
+  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"K[2")),1]+200), label="K", color="#4F9573") +
   scale_x_continuous(limits = c(start,end)) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
@@ -320,23 +334,21 @@ dev.off()
 
 
 
-NIresults$Year <- as.numeric(as.character(NIresults$Year))
+NIyears <- subset(y, Stock == "Northern Inland")$Year
+NISSM <- cbind(sumstats[which(startsWith(rownames(sumstats),"N[3")),c(1,4,8)],as.data.frame(start:end))
 
-png(filename="Results/Northern_Inland_Stock_SSM.png", height = 8, width = 8, units = "in", res = 300)
+png(filename="Results/Northern_Inland_Stock_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
 ggplot() +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"K[3")),4], ymax = sumstats[which(startsWith(vn,"K[3")),8], alpha = .1,fill = "#4F9573") +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"MNPL[3")),4], ymax = sumstats[which(startsWith(vn,"MNPL[3")),8], alpha = .1,fill = "#bd5702") +
-  geom_ribbon(data=cbind(sumstats[which(startsWith(vn,"N[3")),c(4,8)],as.data.frame(start:end)), aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
-  geom_line(data=cbind(sumstats[which(startsWith(vn,"N[3")),1],as.data.frame(start:end)), aes(x = `start:end`, y = `sumstats[which(startsWith(vn, "N[3")), 1]`), col="black") +
-  geom_point(data=NIresults, aes(x=Year, y=Abundance), pch=21, cex=2.5, fill="#af2bb5") +
-  geom_errorbar(data=NIresults, aes(x=Year, ymin = LCL, ymax = UCL), width = 0) +
-  geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[3")),1], col="#bd5702", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"MNPL[3")),1]+500), label="MNPL", color="#bd5702") +
-  # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[3")),4],lty=3, col="#bd5702", lwd=0.65) +
-  # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[3")),8],lty=3, col="#bd5702", lwd=0.65) +
-  geom_hline(yintercept=sumstats[which(startsWith(vn,"K[3")),1],col="#4F9573", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"K[3")),1]+500), label="K", color="#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"K[3")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"K[3")),8], alpha = .1,fill = "#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"MNPL[3")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"MNPL[3")),8], alpha = .1,fill = "#bd5702") +
+  geom_ribbon(data=NISSM, aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
+  geom_line(data=NISSM, aes(x = `start:end`, y = mean), col="black") +
+  geom_point(data = subset(NISSM, `start:end` %in% NIyears), aes(x = `start:end`, y = mean), pch=23, cex=4, fill="#af2bb5") +
+  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"MNPL[3")),1], col="#bd5702", lwd=0.65) +
+  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"MNPL[3")),1]+500), label="MNPL", color="#bd5702") +
+  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"K[3")),1],col="#4F9573", lwd=0.65) +
+  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"K[3")),1]+500), label="K", color="#4F9573") +
   scale_x_continuous(limits = c(start,end)) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
@@ -348,23 +360,21 @@ dev.off()
 
 
 
-SPSresults$Year <- as.numeric(as.character(SPSresults$Year))
+SPSyears <- subset(y, Stock == "Southern Puget Sound")$Year
+SPSSSM <- cbind(sumstats[which(startsWith(rownames(sumstats),"N[4")),c(1,4,8)],as.data.frame(start:end))
 
-png(filename="Results/Southern_Puget_Sound_Stock_SSM.png", height = 8, width = 8, units = "in", res = 300)
+png(filename="Results/Southern_Puget_Sound_Stock_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
 ggplot() +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"K[4")),4], ymax = sumstats[which(startsWith(vn,"K[4")),8], alpha = .1,fill = "#4F9573") +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"MNPL[4")),4], ymax = sumstats[which(startsWith(vn,"MNPL[4")),8], alpha = .1,fill = "#bd5702") +
-  geom_ribbon(data=cbind(sumstats[which(startsWith(vn,"N[4")),c(4,8)],as.data.frame(start:end)), aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
-  geom_line(data=cbind(sumstats[which(startsWith(vn,"N[4")),1],as.data.frame(start:end)), aes(x = `start:end`, y = `sumstats[which(startsWith(vn, "N[4")), 1]`), col="black") +
-  geom_point(data=SPSresults, aes(x=Year, y=Abundance), pch=21, cex=2.5, fill="#028dd6") +
-  geom_errorbar(data=SPSresults, aes(x=Year, ymin = LCL, ymax = UCL), width = 0) +
-  geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[4")),1], col="#bd5702", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"MNPL[4")),1]+100), label="MNPL", color="#bd5702") +
-  # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[4")),4],lty=3, col="#bd5702", lwd=0.65) +
-  # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[4")),8],lty=3, col="#bd5702", lwd=0.65) +
-  geom_hline(yintercept=sumstats[which(startsWith(vn,"K[4")),1],col="#4F9573", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"K[4")),1]+100), label="K", color="#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"K[4")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"K[4")),8], alpha = .1,fill = "#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"MNPL[4")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"MNPL[4")),8], alpha = .1,fill = "#bd5702") +
+  geom_ribbon(data=SPSSSM, aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
+  geom_line(data=SPSSSM, aes(x = `start:end`, y = mean), col="black") +
+  geom_point(data = subset(SPSSSM, `start:end` %in% SPSyears), aes(x = `start:end`, y = mean), pch=23, cex=4, fill="#028dd6") +
+  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"MNPL[4")),1], col="#bd5702", lwd=0.65) +
+  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"MNPL[4")),1]+100), label="MNPL", color="#bd5702") +
+  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"K[4")),1],col="#4F9573", lwd=0.65) +
+  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"K[4")),1]+100), label="K", color="#4F9573") +
   scale_x_continuous(limits = c(start,end)) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
@@ -373,4 +383,120 @@ ggplot() +
   xlab("Year") + ylab("Abundance")
 
 dev.off()
+
+
+# ## Updated plots by S. Amburgey (CMDSTANR)
+# start <- min(y$Year)
+# end <- max(y$Year)
+# 
+# 
+# Cresults$Year <- as.numeric(as.character(Cresults$Year))
+# 
+# png(filename="Results/Washington_Coast_SSM.png", height = 8, width = 8, units = "in", res = 300)
+# 
+# ggplot() +
+#   # annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"K[1")),4], ymax = sumstats[which(startsWith(vn,"K[1")),8], alpha = .1,fill = "#4F9573") +
+#   # annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"MNPL[1")),4], ymax = sumstats[which(startsWith(vn,"MNPL[1")),8], alpha = .1,fill = "#bd5702") +
+#   geom_ribbon(data=cbind(sumstats[which(startsWith(vn,"N[1")),c(4,8)],as.data.frame(start:end)), aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
+#   geom_line(data=cbind(sumstats[which(startsWith(vn,"N[1")),1],as.data.frame(start:end)), aes(x = `start:end`, y = `sumstats[which(startsWith(vn, "N[1")), 1]`), col="black") +
+#   geom_point(data=Cresults, aes(x=Year, y=Abundance), pch=21, cex=2.5, fill="#06c5c9") +
+#   geom_errorbar(data=Cresults, aes(x=Year, ymin = LCL, ymax = UCL), width = 0) +
+#   # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[1")),1], col="#bd5702", lwd=0.65) +
+#   # annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"MNPL[1")),1]+800), label="MNPL", color="#bd5702") +
+#   # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[1")),4],lty=3, col="#bd5702", lwd=0.65) +
+#   # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[1")),8],lty=3, col="#bd5702", lwd=0.65) +
+#   # geom_hline(yintercept=sumstats[which(startsWith(vn,"K[1")),1],col="#4F9573", lwd=0.65) +
+#   # annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"K[1")),1]+800), label="K", color="#4F9573") +
+#   scale_x_continuous(limits = c(start,end)) +
+#   theme_bw() +
+#   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+#         axis.text = element_text(size=12), axis.title = element_text(size=14)) +
+#   ggtitle("Washington Coast") +
+#   xlab("Year") + ylab("Abundance")
+# 
+# dev.off()
+# 
+# 
+# 
+# HCresults$Year <- as.numeric(as.character(HCresults$Year))
+# 
+# png(filename="Results/Hood_Canal_Stock_SSM.png", height = 8, width = 8, units = "in", res = 300)
+# 
+# ggplot() +
+#   annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"K[2")),4], ymax = sumstats[which(startsWith(vn,"K[2")),8], alpha = .1,fill = "#4F9573") +
+#   annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"MNPL[2")),4], ymax = sumstats[which(startsWith(vn,"MNPL[2")),8], alpha = .1,fill = "#bd5702") +
+#   geom_ribbon(data=cbind(sumstats[which(startsWith(vn,"N[2")),c(4,8)],as.data.frame(start:end)), aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
+#   geom_line(data=cbind(sumstats[which(startsWith(vn,"N[2")),1],as.data.frame(start:end)), aes(x = `start:end`, y = `sumstats[which(startsWith(vn, "N[2")), 1]`), col="black") +
+#   geom_point(data=HCresults, aes(x=Year, y=Abundance), pch=21, cex=2.5, fill="#e82547") +
+#   geom_errorbar(data=HCresults, aes(x=Year, ymin = LCL, ymax = UCL), width = 0) +
+#   geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[2")),1], col="#bd5702", lwd=0.65) +
+#   annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"MNPL[2")),1]+200), label="MNPL", color="#bd5702") +
+#   # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[2")),4],lty=3, col="#bd5702", lwd=0.65) +
+#   # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[2")),8],lty=3, col="#bd5702", lwd=0.65) +
+#   geom_hline(yintercept=sumstats[which(startsWith(vn,"K[2")),1],col="#4F9573", lwd=0.65) +
+#   annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"K[2")),1]+200), label="K", color="#4F9573") +
+#   scale_x_continuous(limits = c(start,end)) +
+#   theme_bw() +
+#   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+#         axis.text = element_text(size=12), axis.title = element_text(size=14)) +
+#   ggtitle("Hood Canal Stock") +
+#   xlab("Year") + ylab("Abundance")
+# 
+# dev.off()
+# 
+# 
+# 
+# NIresults$Year <- as.numeric(as.character(NIresults$Year))
+# 
+# png(filename="Results/Northern_Inland_Stock_SSM.png", height = 8, width = 8, units = "in", res = 300)
+# 
+# ggplot() +
+#   annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"K[3")),4], ymax = sumstats[which(startsWith(vn,"K[3")),8], alpha = .1,fill = "#4F9573") +
+#   annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"MNPL[3")),4], ymax = sumstats[which(startsWith(vn,"MNPL[3")),8], alpha = .1,fill = "#bd5702") +
+#   geom_ribbon(data=cbind(sumstats[which(startsWith(vn,"N[3")),c(4,8)],as.data.frame(start:end)), aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
+#   geom_line(data=cbind(sumstats[which(startsWith(vn,"N[3")),1],as.data.frame(start:end)), aes(x = `start:end`, y = `sumstats[which(startsWith(vn, "N[3")), 1]`), col="black") +
+#   geom_point(data=NIresults, aes(x=Year, y=Abundance), pch=21, cex=2.5, fill="#af2bb5") +
+#   geom_errorbar(data=NIresults, aes(x=Year, ymin = LCL, ymax = UCL), width = 0) +
+#   geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[3")),1], col="#bd5702", lwd=0.65) +
+#   annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"MNPL[3")),1]+500), label="MNPL", color="#bd5702") +
+#   # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[3")),4],lty=3, col="#bd5702", lwd=0.65) +
+#   # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[3")),8],lty=3, col="#bd5702", lwd=0.65) +
+#   geom_hline(yintercept=sumstats[which(startsWith(vn,"K[3")),1],col="#4F9573", lwd=0.65) +
+#   annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"K[3")),1]+500), label="K", color="#4F9573") +
+#   scale_x_continuous(limits = c(start,end)) +
+#   theme_bw() +
+#   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+#         axis.text = element_text(size=12), axis.title = element_text(size=14)) +
+#   ggtitle("Northern Inland Stock") +
+#   xlab("Year") + ylab("Abundance")
+# 
+# dev.off()
+# 
+# 
+# 
+# SPSresults$Year <- as.numeric(as.character(SPSresults$Year))
+# 
+# png(filename="Results/Southern_Puget_Sound_Stock_SSM.png", height = 8, width = 8, units = "in", res = 300)
+# 
+# ggplot() +
+#   annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"K[4")),4], ymax = sumstats[which(startsWith(vn,"K[4")),8], alpha = .1,fill = "#4F9573") +
+#   annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(vn,"MNPL[4")),4], ymax = sumstats[which(startsWith(vn,"MNPL[4")),8], alpha = .1,fill = "#bd5702") +
+#   geom_ribbon(data=cbind(sumstats[which(startsWith(vn,"N[4")),c(4,8)],as.data.frame(start:end)), aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
+#   geom_line(data=cbind(sumstats[which(startsWith(vn,"N[4")),1],as.data.frame(start:end)), aes(x = `start:end`, y = `sumstats[which(startsWith(vn, "N[4")), 1]`), col="black") +
+#   geom_point(data=SPSresults, aes(x=Year, y=Abundance), pch=21, cex=2.5, fill="#028dd6") +
+#   geom_errorbar(data=SPSresults, aes(x=Year, ymin = LCL, ymax = UCL), width = 0) +
+#   geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[4")),1], col="#bd5702", lwd=0.65) +
+#   annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"MNPL[4")),1]+100), label="MNPL", color="#bd5702") +
+#   # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[4")),4],lty=3, col="#bd5702", lwd=0.65) +
+#   # geom_hline(yintercept=sumstats[which(startsWith(vn,"MNPL[4")),8],lty=3, col="#bd5702", lwd=0.65) +
+#   geom_hline(yintercept=sumstats[which(startsWith(vn,"K[4")),1],col="#4F9573", lwd=0.65) +
+#   annotate(geom="text", x=1980, y=(sumstats[which(startsWith(vn,"K[4")),1]+100), label="K", color="#4F9573") +
+#   scale_x_continuous(limits = c(start,end)) +
+#   theme_bw() +
+#   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+#         axis.text = element_text(size=12), axis.title = element_text(size=14)) +
+#   ggtitle("Southern Puget Sound Stock") +
+#   xlab("Year") + ylab("Abundance")
+# 
+# dev.off()
 

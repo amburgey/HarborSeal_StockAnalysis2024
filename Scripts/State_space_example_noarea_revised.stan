@@ -11,8 +11,8 @@ data {
   array[Nsrv] int<lower=0> yr ;   // Year of each survey
   array[Nsrv] int<lower=0> st ;   // Stock ID of each survey  
   array[Nsrv] int<lower=0> Obs ;  // Observed population count (adjusted) for each survey  
-  vector<lower=0>[Nstk] N_min ;   // Minimum count for each stock (used to "ground" log N0 values )  
-  vector<lower=0>[Nstk] N_max ;   // Maximum count for each stock (used to "ground" log K values )
+  vector<lower=1>[Nstk] N_min ;   // Minimum count for each stock (used to "ground" log N0 values )  
+  vector<lower=1>[Nstk] N_max ;   // Maximum count for each stock (used to "ground" log K values )
   vector<lower=0>[Nsrv] a ;       // Alpha parameter for beta distribution of correction factor informed by Huber et al. and London et al.
   vector<lower=0>[Nsrv] b ;       // Beta parameter for beta distribution of correction factor informed by Huber et al. and London et al.
  }
@@ -24,13 +24,13 @@ transformed data {
 // The parameters accepted by the model. 
 parameters {
   vector<lower=0,upper=1>[Nstk] rmax;
-  real<lower=1,upper=4> z;            // changed from 0 to 10; growth rate inflection (theta of theta-logistic)
+  real<lower=0,upper=10> z;           // growth rate inflection (theta of theta-logistic)
   vector[Nstk] log_K ;                // log K for each stock
-  vector<lower=0>[Nstk] log_N0 ;      // initial log abundance for each stock at year 1
-  real<lower=0,upper=1.5> sigma_K ;   // variation in log K density among stocks
-  real<lower=-0.25> sigma_r ;         // stochastic variation in instantaneos growth rate
+  vector<lower=1>[Nstk] log_N0 ;      // initial log abundance for each stock at year 1
+  real<lower=-1,upper=5> sigma_K ;     // variation in log K density among stocks (was lower=0,upper=3)
+  real<lower=-0.3> sigma_r ;          // stochastic variation in instantaneos growth rate
   matrix[Nstk,Nyrs-1] eps ;           // stochastic effects by stock and year 
-  real<lower=0,upper=60> phi ;        // inverse scale param for negative binom: observer error
+  real<lower=0, upper=500> phi ;        // inverse scale param for negative binom: observer error (did take up to 200; lower=0,upper=150)
   vector<lower=0,upper=1>[Nsrv] cf ;  // correction factor for animals not on shore
 }
 // Transformed and derived parameters
@@ -57,12 +57,12 @@ model {
     Obs[j] ~ neg_binomial_2( N[st[j] , yr[j]] * cf[j] , phi) ;   // observations are the real abundance modified by the correction factor for each observation for each stock in each year
   }
   // Priors:
-  rmax ~ gamma(0.25*10,10) ;           // weakly informed prior for rmax, biological feasibility
-  z ~ gamma(2.5,1.5) ;                 // based on Laake et al. and previous literature  log_N0 ~ cauchy(log_N_min,1) ;       // vague shrinkage half-cauchy prior
+  rmax ~ beta(0.25*10,10) ;           // weakly informed prior for rmax, biological feasibility
+  z ~ gamma(2.5,1.5) ;                 // based on Laake et al. and previous literature
   sigma_K ~ cauchy(0,0.1) ;            // vague shrinkage half-cauchy prior
   sigma_r ~ cauchy(0,0.01) ;           // vague shrinkage half-cauchy prior
   log_N0 ~ normal(log_N_min, 1) ;     // weakly informed prior for N0
-  phi ~ cauchy(0,2.5) ;                // vague shrinkage half-cauchy prior
+  phi ~ cauchy(0,1) ;                // vague shrinkage half-cauchy prior (cauchy(0,2.5))
   // Random effects:
   log_K ~ normal(log_N_max, sigma_K) ;
   for(i in 1:Nstk){
