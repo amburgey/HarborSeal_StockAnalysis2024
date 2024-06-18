@@ -146,7 +146,7 @@ Nstk <- max(st)
 # Nyrs = number of years of dynamics (including years with no surveys),
 Nyrs <- max(y$Year) - Year0
 # Nsrv = total number surveys at the stock level (e.g. if 5 stocks were each surveyed in 5 different years, Nsrv=25)
-Nsrv <- 77 #length(table(y$Year))
+Nsrv <- dim(y)[1] #length(table(y$Year))
 # Get values for informative priors; however, since no longer correcting counts prior to the model, we may need to adjust these slightly
 dfsum = y %>% group_by(Stock) %>%
   summarise(N0_pri = min(Count.total),
@@ -175,21 +175,25 @@ init_fun = function(){
   list(rmax = runif(4,0.2,0.3),
        z = runif(1,1,3),
        sigma_K = runif(1,0.25,1),
-       sigma_r = 0.001,
-       log_N0 = runif(Nstk,.9 * log(dfsum$N0_pri),1.1 * log(dfsum$N0_pri) ),
+       sigma_r = runif(1,0,0.25),
+       log_N0 = runif(Nstk,0.9 * log(dfsum$N0_pri),1.1 * log(dfsum$N0_pri) ),
        phi = runif(1,10,30) ) }
+
+## try constant cf of a/(a+b) > check if beta should be narrower, check if cf is messing it up
+## have beta parameters add higher values to keep constrained and not let too high or too low values
+## remove Hood Canal and see if error still happens, or try phi three stocks and separate HC phi
+## try phi cauchy with 1 or less sigma to keep large values from happening
+## could try adding one to N * cf to see
+
 
 #Rstan - trying these to deal with permission issues
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
-
-## TRY UPDATING CORRECTION FACTOR TO 0.00001 INSTEAD OF LOWER ZERO
-
-fit <- stan(file = fitmodel, data = stan.data, chains=6, warmup = 10000, iter = 30000, pars = parms,  #warmup = 30000, iter = 50000
+fit <- stan(file = fitmodel, data = stan.data, chains=6, warmup = 2000, iter = 10000, pars = parms,  #warmup = 30000, iter = 50000
             control=list(adapt_delta=0.99))  #, max_treedepth=12
 stan_trace(fit, pars = parms[1])
-saveRDS(fit, file="Results/fit_test_freePHI.rds")
-save(fit, file="Results/fit_test_freePHI.Rdata")
+saveRDS(fit, file="Results/fit_test_nonzero.rds")
+save(fit, file="Results/fit_test_nonzero.Rdata")
 
 
 #Cmdstanr - issues with writing files (permissions)
@@ -282,6 +286,8 @@ plot(fit, pars = "K", show_density = TRUE)
 
 ifelse(sumstats$Rhat > 1.1, print("Failed to converge"), print("Less than 1.1"))
 
+list_of_draws <- extract(fit)
+min(list_of_draws$N[,4,])
 
 ## Updated plots by S. Amburgey (RSTAN)
 start <- min(y$Year)
