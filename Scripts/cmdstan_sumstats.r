@@ -49,4 +49,4 @@
 ## RSTAN
 
 # sumstats <- as.data.frame(summary(fit)$summary)
-sumstats <- summarise_draws(subset_draws(as_draws(fit),chain=keepchains), "mean","median","sd","mad", ~quantile(.x, probs = c(0.025,0.5,0.975)),"rhat")
+sumstats <- summarise_draws(subset_draws(as_draws(fit),chain=keepchains), "mean","median","sd","mad", ~quantile(.x, probs = c(0.025,0.20,0.5,0.975)),"rhat")
