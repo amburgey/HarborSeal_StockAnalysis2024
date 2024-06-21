@@ -131,7 +131,9 @@ y <- yfinal %>%
   mutate(occ = dense_rank(Year)) %>%
   ungroup() %>%
   mutate(Stock = factor(Stock, levels = c("Coastal","Hood Canal","Northern Inland","Southern Puget Sound"))) %>%
-  arrange(Stock,Year)
+  arrange(Stock,Year) #%>%
+  # filter(Stock != "Hood Canal") %>%
+  # mutate(Stock = factor(Stock, levels = c("Coastal","Northern Inland","Southern Puget Sound")))
 
 # Year before earliest survey
 Year0 <- min(y$Year) - 1
@@ -164,7 +166,8 @@ stan.data = list(Nstk=Nstk,
                  b=y$beta,
                  yr=yr,
                  st=st,
-                 Obs=Obs)
+                 Obs=Obs) #,
+                 # cf=y$alpha/(y$alpha+y$beta))
 
 # Fit model-------------------------------------------------
 fitmodel = "Scripts/State_space_example_noarea_revised.stan"
@@ -172,7 +175,7 @@ fitmodel = "Scripts/State_space_example_noarea_revised.stan"
 parms = c("rmax","z","sigma_K","sigma_r","phi","K","MNPL","N","OSP")
 
 init_fun = function(){
-  list(rmax = runif(4,0.2,0.3),
+  list(rmax = runif(Nstk,0.2,0.3),
        z = runif(1,1,3),
        sigma_K = runif(1,0.25,1),
        sigma_r = runif(1,0,0.25),
@@ -189,11 +192,14 @@ init_fun = function(){
 #Rstan - trying these to deal with permission issues
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
-fit <- stan(file = fitmodel, data = stan.data, chains=6, warmup = 2000, iter = 10000, pars = parms,  #warmup = 30000, iter = 50000
+fit <- stan(file = fitmodel, data = stan.data, chains=6, warmup = 1000, iter = 5000, pars = parms,  #warmup = 30000, iter = 50000
             control=list(adapt_delta=0.99))  #, max_treedepth=12
 stan_trace(fit, pars = parms[1])
-saveRDS(fit, file="Results/fit_test_nonzero.rds")
-save(fit, file="Results/fit_test_nonzero.Rdata")
+saveRDS(fit, file="Results/SSM_revision.rds")
+save(fit, file="Results/SSM_revision.Rdata")
+
+#subset chains that are stuck
+keepchains <- c(1:2,4:6)
 
 
 #Cmdstanr - issues with writing files (permissions)
@@ -224,8 +230,7 @@ save(fit, file="Results/fit_test_nonzero.Rdata")
 # saveRDS(fit, file = "Results/fit_SSM.rds")  #this will betray you and not save the tmp files needed to access results from model runs
 # save(fit, file="Results/fit_SSM.Rdata")     #USE THIS INSTEAD
 
-# load("Results/fit_SSM_OSP_rev.Rdata")
-load("Results/fit_test.Rdata")
+load("Results/SSM_revision.Rdata")
 
 
 ## CMDSTANR
@@ -276,7 +281,6 @@ load("Results/fit_test.Rdata")
 ## RSTAN
 source("Scripts/cmdstan_sumstats.r")
 
-
 plot(fit, pars = "rmax", show_density = TRUE)
 plot(fit, pars = "z", show_density = TRUE)
 plot(fit, pars = "sigma_r", show_density = TRUE)
@@ -284,10 +288,16 @@ plot(fit, pars = "sigma_K", show_density = TRUE)
 plot(fit, pars = "phi", show_density = TRUE)
 plot(fit, pars = "K", show_density = TRUE)
 
-ifelse(sumstats$Rhat > 1.1, print("Failed to converge"), print("Less than 1.1"))
+#manually plot subset
+parint <- as.data.frame(subset_draws(as_draws(fit),chain=keepchains)[,,"rmax[1]"])
 
-list_of_draws <- extract(fit)
-min(list_of_draws$N[,4,])
+plot(parint[,1], type="l", col="red")
+lines(parint[,2], type="l", col="blue")
+lines(parint[,3], type="l", col="yellow")
+lines(parint[,4], type="l", col="green")
+lines(parint[,5], type="l", col="purple")
+
+ifelse(sumstats$rhat > 1.1, print("Failed to converge"), print("Less than 1.1"))
 
 ## Updated plots by S. Amburgey (RSTAN)
 start <- min(y$Year)
@@ -295,13 +305,13 @@ end <- max(y$Year)
 
 
 Cyears <- subset(y, Stock == "Coastal")$Year
-CSSM <- cbind(sumstats[which(startsWith(rownames(sumstats),"N[1")),c(1,4,8)],as.data.frame(start:end))
+CSSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[1")),c(1:2,6,8)],as.data.frame(start:end))
 
 png(filename="Results/Washington_Coast_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
 ggplot() +
-  geom_ribbon(data=CSSM[,c(2:4)], aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
-  geom_line(data=CSSM[,c(1,4)], aes(x = `start:end`, y = mean), col="black") +
+  geom_ribbon(data=CSSM, aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
+  geom_line(data=CSSM, aes(x = `start:end`, y = mean), col="black") +
   geom_point(data = subset(CSSM, `start:end` %in% Cyears), aes(x = `start:end`, y = mean), pch=23, cex=4, fill="#06c5c9") +
   scale_x_continuous(limits = c(start,end)) +
   theme_bw() +
@@ -314,21 +324,21 @@ dev.off()
 
 
 HCyears <- subset(y, Stock == "Hood Canal")$Year
-HCSSM <- cbind(sumstats[which(startsWith(rownames(sumstats),"N[2")),c(1,4,8)],as.data.frame(start:end))
+HCSSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[2")),c(1:2,6,8)],as.data.frame(start:end))
 
 
 png(filename="Results/Hood_Canal_Stock_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
 ggplot() +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"K[2")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"K[2")),8], alpha = .1,fill = "#4F9573") +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"MNPL[2")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"MNPL[2")),8], alpha = .1,fill = "#bd5702") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[2")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[2")),8]), alpha = .1,fill = "#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[2")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[2")),8]), alpha = .1,fill = "#bd5702") +
   geom_ribbon(data=HCSSM, aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
   geom_line(data=HCSSM, aes(x = `start:end`, y = mean), col="black") +
   geom_point(data = subset(HCSSM, `start:end` %in% HCyears), aes(x = `start:end`, y = mean), pch=23, cex=4, fill="#e82547") +
-  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"MNPL[2")),1], col="#bd5702", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"MNPL[2")),1]+200), label="MNPL", color="#bd5702") +
-  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"K[2")),1],col="#4F9573", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"K[2")),1]+200), label="K", color="#4F9573") +
+  geom_hline(yintercept=as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[2")),2]), col="#bd5702", lwd=0.65) +
+  annotate(geom="text", x=1980, y=as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[2")),2]+200), label="MNPL", color="#bd5702") +
+  geom_hline(yintercept=as.numeric(sumstats[which(startsWith(sumstats$variable,"K[2")),2]),col="#4F9573", lwd=0.65) +
+  annotate(geom="text", x=1980, y=as.numeric(sumstats[which(startsWith(sumstats$variable,"K[2")),2]+200), label="K", color="#4F9573") +
   scale_x_continuous(limits = c(start,end)) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
@@ -341,20 +351,20 @@ dev.off()
 
 
 NIyears <- subset(y, Stock == "Northern Inland")$Year
-NISSM <- cbind(sumstats[which(startsWith(rownames(sumstats),"N[3")),c(1,4,8)],as.data.frame(start:end))
+NISSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[3")),c(1:2,6,8)],as.data.frame(start:end))
 
 png(filename="Results/Northern_Inland_Stock_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
 ggplot() +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"K[3")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"K[3")),8], alpha = .1,fill = "#4F9573") +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"MNPL[3")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"MNPL[3")),8], alpha = .1,fill = "#bd5702") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[3")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[3")),8]), alpha = .1,fill = "#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[3")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[3")),8]), alpha = .1,fill = "#bd5702") +
   geom_ribbon(data=NISSM, aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
   geom_line(data=NISSM, aes(x = `start:end`, y = mean), col="black") +
   geom_point(data = subset(NISSM, `start:end` %in% NIyears), aes(x = `start:end`, y = mean), pch=23, cex=4, fill="#af2bb5") +
-  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"MNPL[3")),1], col="#bd5702", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"MNPL[3")),1]+500), label="MNPL", color="#bd5702") +
-  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"K[3")),1],col="#4F9573", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"K[3")),1]+500), label="K", color="#4F9573") +
+  geom_hline(yintercept=as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[3")),2]), col="#bd5702", lwd=0.65) +
+  annotate(geom="text", x=1980, y=as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[3")),2]+500), label="MNPL", color="#bd5702") +
+  geom_hline(yintercept=as.numeric(sumstats[which(startsWith(sumstats$variable,"K[3")),2]),col="#4F9573", lwd=0.65) +
+  annotate(geom="text", x=1980, y=as.numeric(sumstats[which(startsWith(sumstats$variable,"K[3")),2]+500), label="K", color="#4F9573") +
   scale_x_continuous(limits = c(start,end)) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
@@ -367,20 +377,20 @@ dev.off()
 
 
 SPSyears <- subset(y, Stock == "Southern Puget Sound")$Year
-SPSSSM <- cbind(sumstats[which(startsWith(rownames(sumstats),"N[4")),c(1,4,8)],as.data.frame(start:end))
+SPSSSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[4")),c(1:2,6,8)],as.data.frame(start:end))
 
 png(filename="Results/Southern_Puget_Sound_Stock_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
 ggplot() +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"K[4")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"K[4")),8], alpha = .1,fill = "#4F9573") +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = sumstats[which(startsWith(rownames(sumstats),"MNPL[4")),4], ymax = sumstats[which(startsWith(rownames(sumstats),"MNPL[4")),8], alpha = .1,fill = "#bd5702") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[4")),4]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[4")),8]), alpha = .1,fill = "#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[4")),4]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[4")),8]), alpha = .1,fill = "#bd5702") +
   geom_ribbon(data=SPSSSM, aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
   geom_line(data=SPSSSM, aes(x = `start:end`, y = mean), col="black") +
   geom_point(data = subset(SPSSSM, `start:end` %in% SPSyears), aes(x = `start:end`, y = mean), pch=23, cex=4, fill="#028dd6") +
-  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"MNPL[4")),1], col="#bd5702", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"MNPL[4")),1]+100), label="MNPL", color="#bd5702") +
-  geom_hline(yintercept=sumstats[which(startsWith(rownames(sumstats),"K[4")),1],col="#4F9573", lwd=0.65) +
-  annotate(geom="text", x=1980, y=(sumstats[which(startsWith(rownames(sumstats),"K[4")),1]+100), label="K", color="#4F9573") +
+  geom_hline(yintercept=as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[4")),2]), col="#bd5702", lwd=0.65) +
+  annotate(geom="text", x=1980, y=as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[4")),2]+100), label="MNPL", color="#bd5702") +
+  geom_hline(yintercept=as.numeric(sumstats[which(startsWith(sumstats$variable,"K[4")),2]),col="#4F9573", lwd=0.65) +
+  annotate(geom="text", x=1980, y=as.numeric(sumstats[which(startsWith(sumstats$variable,"K[4")),2]+100), label="K", color="#4F9573") +
   scale_x_continuous(limits = c(start,end)) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
