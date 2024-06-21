@@ -299,13 +299,16 @@ lines(parint[,5], type="l", col="purple")
 
 ifelse(sumstats$rhat > 1.1, print("Failed to converge"), print("Less than 1.1"))
 
+#write summary of model results
+write.csv(sumstats, "Results/HarborSeals_SSM_summary.csv")
+
 ## Updated plots by S. Amburgey (RSTAN)
 start <- min(y$Year)
 end <- max(y$Year)
 
 
 Cyears <- subset(y, Stock == "Coastal")$Year
-CSSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[1")),c(1:2,6,8)],as.data.frame(start:end))
+CSSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[1")),c(1:2,6,9)],as.data.frame(start:end))
 
 png(filename="Results/Washington_Coast_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
@@ -324,14 +327,14 @@ dev.off()
 
 
 HCyears <- subset(y, Stock == "Hood Canal")$Year
-HCSSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[2")),c(1:2,6,8)],as.data.frame(start:end))
+HCSSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[2")),c(1:2,6,9)],as.data.frame(start:end))
 
 
 png(filename="Results/Hood_Canal_Stock_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
 ggplot() +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[2")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[2")),8]), alpha = .1,fill = "#4F9573") +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[2")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[2")),8]), alpha = .1,fill = "#bd5702") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[2")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[2")),9]), alpha = .1,fill = "#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[2")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[2")),9]), alpha = .1,fill = "#bd5702") +
   geom_ribbon(data=HCSSM, aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
   geom_line(data=HCSSM, aes(x = `start:end`, y = mean), col="black") +
   geom_point(data = subset(HCSSM, `start:end` %in% HCyears), aes(x = `start:end`, y = mean), pch=23, cex=4, fill="#e82547") +
@@ -351,13 +354,13 @@ dev.off()
 
 
 NIyears <- subset(y, Stock == "Northern Inland")$Year
-NISSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[3")),c(1:2,6,8)],as.data.frame(start:end))
+NISSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[3")),c(1:2,6,9)],as.data.frame(start:end))
 
 png(filename="Results/Northern_Inland_Stock_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
 ggplot() +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[3")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[3")),8]), alpha = .1,fill = "#4F9573") +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[3")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[3")),8]), alpha = .1,fill = "#bd5702") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[3")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[3")),9]), alpha = .1,fill = "#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[3")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[3")),9]), alpha = .1,fill = "#bd5702") +
   geom_ribbon(data=NISSM, aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
   geom_line(data=NISSM, aes(x = `start:end`, y = mean), col="black") +
   geom_point(data = subset(NISSM, `start:end` %in% NIyears), aes(x = `start:end`, y = mean), pch=23, cex=4, fill="#af2bb5") +
@@ -377,13 +380,13 @@ dev.off()
 
 
 SPSyears <- subset(y, Stock == "Southern Puget Sound")$Year
-SPSSSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[4")),c(1:2,6,8)],as.data.frame(start:end))
+SPSSSM <- cbind(sumstats[which(startsWith(sumstats$variable,"N[4")),c(1:2,6,9)],as.data.frame(start:end))
 
 png(filename="Results/Southern_Puget_Sound_Stock_SSM_rev.png", height = 8, width = 8, units = "in", res = 300)
 
 ggplot() +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[4")),4]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[4")),8]), alpha = .1,fill = "#4F9573") +
-  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[4")),4]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[4")),8]), alpha = .1,fill = "#bd5702") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[4")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"K[4")),9]), alpha = .1,fill = "#4F9573") +
+  annotate("rect", xmin = 1977, xmax = 2023, ymin = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[4")),6]), ymax = as.numeric(sumstats[which(startsWith(sumstats$variable,"MNPL[4")),9]), alpha = .1,fill = "#bd5702") +
   geom_ribbon(data=SPSSSM, aes(ymin = `2.5%`, ymax = `97.5%`, x = `start:end`), fill = "grey", alpha = 0.5) +
   geom_line(data=SPSSSM, aes(x = `start:end`, y = mean), col="black") +
   geom_point(data = subset(SPSSSM, `start:end` %in% SPSyears), aes(x = `start:end`, y = mean), pch=23, cex=4, fill="#028dd6") +
