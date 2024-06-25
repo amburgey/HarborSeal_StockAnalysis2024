@@ -73,10 +73,10 @@ sd_p <- sqrt(var_p)
 #Calculate a weighted (by the number of surveys) mean of the variance and the standard deviation
 var_pweighted <- weighted.mean(var_p,Hubdat[,"nsurv"]/max(Hubdat[,"nsurv"]))
 sd_pweighted <- weighted.mean(sd_p,Hubdat[,"nsurv"]/max(Hubdat[,"nsurv"]))
-#Calculate phi ([(p*(1-p))/var]-1) from p_hat
-# Hubdat$phi <- ((Hubdat$p*(1-Hubdat$p))/var_p)-1
+#Calculate sigma_p ([(p*(1-p))/var]-1) from p_hat
+# Hubdat$sigma_p <- ((Hubdat$p*(1-Hubdat$p))/var_p)-1
 #Could bootstrap using these var and sd values to generate a distribution of vars and sds
-# var_boot <- matrix(rbeta(6000,Hubdat$p*Hubdat$phi,(1-Hubdat$p)*Hubdat$phi),6)  #could repeat per each number of surveys to get a weighted bootstrap std
+# var_boot <- matrix(rbeta(6000,Hubdat$p*Hubdat$phi,(1-Hubdat$p)*Hubdat$sigma_p),6)  #could repeat per each number of surveys to get a weighted bootstrap std
 # sd_boot <- sd(colMeans(pboot))
 
 ## Calculate correction factor for Hood Canal.----
@@ -102,10 +102,10 @@ HCdata2 <- cbind(HCdata[,c("Sitecode","Stock","Year","Count.total")],p=p,sdp=sqr
 ## Combine all datasets together.----
 yall <- rbind(cbind(alldata[,c("Sitecode","Stock","Year","Count.total")],p=weighted.mean(Hubdat[,"p"],Hubdat[,"nsurv"]/max(Hubdat[,"nsurv"])),sdp=sd_pweighted),HCdata2)
 
-## Calculate phi (precision) in order to derive alpha and beta (shape parameters) to describe the beta distribution.----
-yall$phi <- ((yall$p*(1-yall$p))/(yall$sdp)^2)-1
-yall$a <- yall$p*yall$phi       #alpha
-yall$b <- (1-yall$p)*yall$phi   #beta
+## Calculate sigma_p (precision) in order to derive alpha and beta (shape parameters) to describe the beta distribution.----
+yall$sigma_p <- ((yall$p*(1-yall$p))/(yall$sdp)^2)-1
+yall$a <- yall$p*yall$sigma_p       #alpha
+yall$b <- (1-yall$p)*yall$sigma_p   #beta
 
 ## Go from at least one or multiple counts at every haulout every year -> alpha and beta values for each stock each year.----
 #First, take the mean count, alpha, and beta value at each haulout each year
