@@ -192,7 +192,7 @@ init_fun = function(){
 #Rstan - trying these to deal with permission issues
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
-fit <- stan(file = fitmodel, data = stan.data, chains=6, warmup = 1000, iter = 5000, pars = parms,  #warmup = 30000, iter = 50000
+fit <- stan(file = fitmodel, data = stan.data, chains=6, warmup = 1000, iter = 5000, pars = parms,  #chains = 6
             control=list(adapt_delta=0.99))  #, max_treedepth=12
 stan_trace(fit, pars = parms[1])
 saveRDS(fit, file="Results/SSM_revision.rds")
