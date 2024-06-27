@@ -198,8 +198,8 @@ stan_trace(fit, pars = parms[1])
 saveRDS(fit, file="Results/SSM_revision.rds")
 save(fit, file="Results/SSM_revision.Rdata")
 
-#subset chains that are stuck
-keepchains <- c(1:2,4:6)
+# #subset chains that are stuck
+# keepchains <- c(1:2,4:6)
 
 
 #Cmdstanr - issues with writing files (permissions)
@@ -289,13 +289,13 @@ plot(fit, pars = "phi", show_density = TRUE)
 plot(fit, pars = "K", show_density = TRUE)
 
 #manually plot subset
-parint <- as.data.frame(subset_draws(as_draws(fit),chain=keepchains)[,,"rmax[1]"])
-
-plot(parint[,1], type="l", col="red")
-lines(parint[,2], type="l", col="blue")
-lines(parint[,3], type="l", col="yellow")
-lines(parint[,4], type="l", col="green")
-lines(parint[,5], type="l", col="purple")
+# parint <- as.data.frame(subset_draws(as_draws(fit),chain=keepchains)[,,"rmax[1]"])
+# 
+# plot(parint[,1], type="l", col="red")
+# lines(parint[,2], type="l", col="blue")
+# lines(parint[,3], type="l", col="yellow")
+# lines(parint[,4], type="l", col="green")
+# lines(parint[,5], type="l", col="purple")
 
 ifelse(sumstats$rhat > 1.1, print("Failed to converge"), print("Less than 1.1"))
 
