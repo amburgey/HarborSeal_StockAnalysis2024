@@ -81,7 +81,7 @@ countplot2 <- ggplot(data=subset(allmean, Stock %in% c("Hood Canal","Southern Pu
         axis.title.y.right = element_text(margin = margin(t=0, r=0, b=0, l=10))) +
   geom_point(data = subset(blankdat, Stock %in% c("Hood Canal","Southern Puget Sound")), aes(x = year, y = summnAd), color = "red", alpha = 0)  #blanked out point to get scales the same
 
-jpeg(file = "Results/Adult_Pup_Counts_Stock.jpg", width=10, height=6, units="in", res=300)
+jpeg(file = "Results/Adult_Pup_Counts_Stock.jpg", width=10, height=6, units="in", res=600)
 ggarrange(countplot1, countplot2, ncol = 1, nrow = 2)
 dev.off()
 
@@ -114,7 +114,7 @@ countplot4 <- ggplot(data=subset(allmean, Stock %in% c("Hood Canal","Southern Pu
         axis.title = element_text(size=14), strip.text.x = element_text(size=12)) +
   geom_point(data = subset(blankdat, Stock %in% c("Hood Canal","Southern Puget Sound")), aes(x = year, y = summnAd), color = "red", alpha = 0)  #blanked out point to get scales the same
 
-jpeg(file = "Results/Adult_Pup_Counts_Total_Stock.jpg", width=10, height=6, units="in", res=300)
+jpeg(file = "Results/Adult_Pup_Counts_Total_Stock.jpg", width=10, height=6, units="in", res=600)
 ggarrange(countplot3, countplot4, ncol = 1, nrow = 2)
 dev.off()
 
@@ -161,7 +161,7 @@ countplot5 <- ggplot() +
   xlab("Year") + ylab("Summed Mean Count") +
   geom_area(data=blankdat2, aes(x = as.numeric(as.character(year)), y = MeanCount), alpha = 0)  #blanked out point to get scales the same
 
-jpeg(file = "Results/AdultPuptoTotal_Stock.jpg", width=10, height=6, units="in", res=300)
+jpeg(file = "Results/AdultPuptoTotal_Stock.jpg", width=10, height=6, units="in", res=600)
 countplot5
 dev.off()
 
@@ -180,7 +180,7 @@ prop1 <- ggplot(allmean, aes(x = year, y = puptotal, fill = Stock)) +
   scale_fill_manual(values=cols3) +
   scale_x_discrete(breaks=seq(1977,2022,5), limits=factor(1977:2022))
 
-jpeg(file = "Results/PropPupAdult_Stock.jpg", width=10, height=6, units="in", res=300)
+jpeg(file = "Results/PropPupAdult_Stock.jpg", width=10, height=6, units="in", res=600)
 prop1
 dev.off()
 
@@ -229,7 +229,7 @@ cfplot <- ggplot(cfall, aes(y=Stock, x=cf, fill=cf)) +
   scale_fill_continuous(type="viridis") +
   theme(axis.text = element_text(size=12), axis.title = element_text(size=16), legend.position = "none")
 
-jpeg(file = "Results/CorrectionFactor_Stock.jpg", width=10, height=6, units="in", res=300)
+jpeg(file = "Results/CorrectionFactor_Stock.jpg", width=10, height=6, units="in", res=600)
 cfplot
 dev.off()
 
