@@ -3,7 +3,9 @@
 rm(list=ls())
 setwd("S:/WP/Science/Westside Team/Science Datasets/Pinnipeds/Aerial surveys/Analysis")
 library(lubridate);library(tidyverse);library(ggstream);library(ggpubr);library(ggplot2)
-# source("Scripts/data_selection.r")
+
+## For figure without correction factor
+source("Scripts/data_selection.r")
 
 ## Run previous data prep and adjustment scripts for data analysis
 #Create combined dataset for all stocks
